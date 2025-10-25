@@ -1,52 +1,72 @@
-library(tidyverse)
-library(ggplot2)
-library(rvest)
-library(dplyr)
-library(ggbeeswarm)
-library(ggrepel)
+# ANÁLISIS: RELACIÓN ENTRE POSESIÓN OFENSIVA Y EFECTIVIDAD EN LIGA MX
+# Objetivo: Investigar si los equipos que más dominan el área rival generan mejores oportunidades de gol
 
+# ----------------------------
+# 1. CARGA DE LIBRERÍAS
+# ----------------------------
+library(tidyverse)    # Manipulación y visualización de datos
+library(rvest)        # Web scraping para obtener datos de FBRef
+library(ggrepel)      # Etiquetas inteligentes en gráficos
+
+# ----------------------------
+# 2. EXTRACCIÓN DE DATOS EN TIEMPO REAL
+# ----------------------------
+# Fuente: FBRef.com - Estadísticas oficiales de Liga MX
 url <- "https://fbref.com/en/comps/31/Liga-MX-Stats#all_stats_squads_passing"
-datos <- read_html(url)
-txt_pases <- html_text(url)
 
-datos_final <- datos %>%
-  html_table()
-datos_final[[10]]
-datos_final <- datos_final[[10]]
-setwd('/Users/tre/Documents/proyectos personales/fútbol con r/datos')
-write.csv(x= datos_final, file= "tiros.csv")
+# Extraemos la tabla de estadísticas de pases directamente de la página web
+datos_pagina <- read_html(url)
+tablas_pagina <- html_table(datos_pagina)
 
-setwd("/Users/tre/Documents/proyectos personales/fútbol con r/datos")
+# La tabla número 10 contiene las estadísticas de pases que necesitamos
+estadisticas_pases <- tablas_pagina[[10]]
+
+# ----------------------------
+# 3. PREPARACIÓN DEL ANÁLISIS
+# ----------------------------
+# Cargamos datos adicionales de tiros (previamente descargados)
 datos_tiros <- read.csv("tiros.csv")
-datos_pases <- read.csv("pases.csv")
 
-pases_y_tiros <- merge(datos_pases, datos_tiros, by = "Equipo")
+# Combinamos ambos datasets para tener métricas completas por equipo
+datos_completos <- merge(estadisticas_pases, datos_tiros, by = "Equipo")
 
-ggplot(pases_y_tiros, aes(x = Toques_area_rival, y = npxG)) +
-  geom_point(color = "blue") + 
+# ----------------------------
+# 4. ANÁLISIS VISUAL: CORRELACIÓN ENTRE VARIABLES
+# ----------------------------
+ggplot(datos_completos, aes(x = Toques_area_rival, y = npxG)) +
+  geom_point(color = "blue", size = 3, alpha = 0.7) +  # Puntos representando equipos
+  
+  # Etiquetas inteligentes que evitan solapamiento
   geom_text_repel(aes(label = Equipo), 
-                  color = "black", size = 5,  # Color y tamaño de las etiquetas
-                  family = "Arial",  # Tipo de letra de las etiquetas
-                  box.padding = 0.3) +# Dibujar los puntos  # Añadir las etiquetas
+                  color = "black", 
+                  size = 3.5,
+                  box.padding = 0.3,
+                  max.overlaps = 20) +
+  
+  # Personalización completa del tema y etiquetas
   labs(
-    x = "Toques en área rival",  # Cambiar nombre del eje X
-    y = "Goles esperados (sin contar penales)",    # Cambiar nombre del eje Y
-    title = "Liga MX, Apertura 2024",
-    caption= "Fuente: FBRef, 2024" #este es el pie de página
+    x = "Toques en Área Rival (Intensidad Ofensiva)", 
+    y = "Goles Esperados sin Penales (Calidad de Oportunidades)",
+    title = "Análisis Liga MX: ¿Más posesión en área rival = Mejores oportunidades?",
+    subtitle = "Relación entre dominio ofensivo y efectividad en la generación de peligro",
+    caption = "Fuente: FBRef.com | Análisis: [Tu Nombre]"
   ) +
+  
   theme_minimal() +
   theme(
-    # Cambiar el fondo del área de los datos (panel)
-    panel.background = element_rect(fill = "lightpink", color = "black"),  # Fondo azul claro con borde negro
-    
-    # Cambiar el fondo del gráfico completo
-    plot.background = element_rect(fill = "white", color = NA),  # Fondo marfil sin borde
-    
-    # Cambiar color y tipo de letra del título
-    plot.title = element_text(size = 16, color = "blue", face = "bold", family = "Arial"),
-    
-    # Cambiar color y tipo de letra de los títulos de los ejes
-    axis.title.x = element_text(size = 14, color = "blue", face = "bold", family = "Arial"),
-    axis.title.y = element_text(size = 14, color = "blue", face = "bold", family = "Arial")
+    plot.title = element_text(size = 16, face = "bold", color = "darkblue"),
+    plot.subtitle = element_text(size = 12, color = "gray40"),
+    axis.title = element_text(face = "bold", size = 12),
+    panel.grid.major = element_line(color = "gray90"),
+    plot.background = element_rect(fill = "white", color = NA)
   )
-write.csv(x= pases_y_tiros, file="pases y tiros.csv")
+
+# ----------------------------
+# 5. EXPORTACIÓN DE RESULTADOS
+# ----------------------------
+# Guardamos el dataset combinado para análisis futuros
+write.csv(datos_completos, "pases_y_tiros.csv", row.names = FALSE)
+
+# Cálculo de correlación para cuantificar la relación
+correlacion <- cor(datos_completos$Toques_area_rival, datos_completos$npxG, use = "complete.obs")
+print(paste("Correlación entre toques en área y xG:", round(correlacion, 3)))
